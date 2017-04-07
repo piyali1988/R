@@ -1,0 +1,225 @@
+---
+title: "BMI8050.01,  Assignment 2, Spring 2017"
+author: "Piyali Das"
+date: 'Due Date: 7 February 2017'
+output:
+  html_document:
+    highlight: tango
+    theme: cerulean
+  pdf_document: default
+Note: I have discussed ideas with Tara Eicher
+---
+
+1. From the GSE47774 data series (SEQC), grab Illumina count data from the first two different labs (GSE47774_SEQC_ILM_AGR.txt.gz and GSE47774_SEQC_ILM_BGI.txt.gz).
+    a. Summarize the count data: how many samples and transcripts/genes in each data set?  
+  
+There are 256 samples and 43919 transcripts/genes in GSE47774_SEQC_ILM_AGR.txt.gz file
+
+There are 384 samples and 43919 transcripts/genes in GSE47774_SEQC_ILM_BGI.txt.gz file
+    
+
+    b. Check that the transcripts/genes are the same in the data from both labs (e.g. use the function all.equal()).
+    c. For each lab, plot a boxplot of genes or transcripts, color-coded by sample type and replicate number (A1, A2,..., B1, B2,..., C1, C2,...).  Do you see any pattern?
+    d. For each lab, plot a boxplot of spike-ins only.  Do you see any pattern?
+    
+    
+```{r}
+agr <- read.table("ILM_AGR.txt", header = TRUE, sep="\t", row.names = 1)
+dim(agr)
+
+bgi <- read.table("ILM_BGI.txt", header = TRUE, sep="\t", row.names = 1)
+dim(bgi)
+
+```
+```{r}
+#checking equality
+all.equal(rownames(agr), rownames(bgi))
+
+#box plot for lab 1
+set.seed(1234)
+agrsamps <- as.factor(substr(gsub("SEQC_ILM_AGR_","",colnames(agr)),1,3))
+#table(agrsamps)
+agrgenes <- sample(1:nrow(agr),5000)
+newagrdat=log(agr[agrgenes,]+0.0001)
+boxplot(as.data.frame(newagrdat),col=agrsamps,pch=19,xlab="")
+legend(1,-1,unique(agrsamps),col=1:length(agrsamps),pch=19)
+
+#box plot for lab 2
+if(!file.exists("myfile.jpeg")) {
+set.seed(1234)
+bgisamps <- as.factor(substr(gsub("SEQC_ILM_BGI_","",colnames(bgi)),1,3))
+bgigenes <- sample(1:nrow(bgi),5000)
+newbgidat=log(bgi[bgigenes,]+0.0001)
+jpeg("myfile.jpeg")
+boxplot(as.data.frame(newbgidat),col=bgisamps,pch=19,xlab="")
+legend(1,-1,unique(bgisamps),col=1:length(bgisamps),pch=19)
+dev.off()
+}
+
+
+spikeins <- grep("ERCC",rownames(agr))
+boxplot(as.data.frame(newagrdat[spikeins,]),col=agrsamps,pch=19,xlab="")
+#legend(1,-1,unique(agrsamps),col=1:length(agrsamps),pch=19)
+
+spikeins <- grep("ERCC",rownames(bgi))
+boxplot(as.data.frame(newbgidat[spikeins,]),col=bgisamps,pch=19,xlab="")
+#legend(1,-1,unique(bgisamps),col=1:length(bgisamps),pch=19)
+
+```
+c. It is observed that the records of same sample type and replicate number have similar distributions for both labs. They are placed adjacent to each other in the plot with same variation.
+
+d. For Spike-ins, in some places the samples are placed adjacent forming blocks and in others its not unlike the previous plot.
+
+  
+2. Let's try to assess whether the correlations between two replicates within a lab are greather than correlations between two replicates of sample A between two different labs.
+    a. Create a count matrix for each lab, that has the same transcripts/genes, and the first two runs of replicate 1 for sample A (e.g. 8 lanes of one flow cell for sample A in each lab, and 8 lanes of another flow cell for sample A in each lab).  Use the function all.equal() to check that the transcripts and sample types are the same and in the same order.  To decrease run time, you may want to sample your transcripts or genes to a smaller subset like we did in class.
+    b. Plot the correlation coefficients (e.g. numbers) when comparing all lanes of sample A (16 total) for lab 1.
+    c. Plot the correlation coefficients (e.g. numbers) when comparing all lanes of sample A (16 total) for lab 2.
+    d. Plot the correlation coefficients (e.g. numbers) when comparing the first 8 lanes of sample A in lab 1 and the first 8 lanes of sample B in lab 2.
+    e. Describe whether the correlation is higher/lower when comparing two flow cells within the same lab or two flow cells run in two different labs.  Is this what you would expect?
+    
+```{r}
+#Count Matrix Lab1, lab2
+newagrdat = agr[agrgenes,]
+newbgidat = bgi[agrgenes,]
+Asamps <- c(grep("_A_1_",colnames(agr))[1:16])
+matA <- agr[,Asamps]
+Bsamps <- c(grep("_A_1_",colnames(bgi))[1:16])
+matB <- bgi[,Bsamps]
+all.equal(rownames(matA),rownames(matB))
+all.equal(colnames(matA),colnames(matB))
+```
+
+```{r}
+#Correlation plot for all lanes Sample A in lab 1
+if(!require("corrplot")){
+      install.packages("corrplot")
+      library(corrplot)
+    }
+
+shortnamesA <- gsub("_CGATGT_.*","B",gsub("SEQC_ILM_AGR_","",gsub("_ATCACG_A.*","A",gsub("_ATCACG_B.*","B",colnames(matA)[Asamps]))))
+
+colnames(matA)[Asamps] <- shortnamesA
+mycorr <- cor(matA[,Asamps])
+range(mycorr)
+corrplot(mycorr,method="number",number.cex=0.6)
+```
+
+```{r}
+#Correlation plot for all lanes Sample A in lab 2
+shortnamesB <- gsub("_CGATGT_.*","B",gsub("SEQC_ILM_BGI_","",gsub("_ATCACG_A.*","A",gsub("_ATCACG_B.*","B",colnames(matB)[Bsamps]))))
+colnames(matB)[Bsamps] <- shortnamesB
+mycorr1 <- cor(matB[,Bsamps])
+range(mycorr1)
+corrplot(mycorr1,method="number",number.cex=0.6)
+```
+
+```{r}
+#Correlation plot for 8 lanes of sample A in lab 1 and the first 8 lanes of sample B in lab 2
+Asamps1 <- c(grep("_A_1_",colnames(agr))[1:8])
+Bsamps1 <- c(grep("_B_1_",colnames(bgi))[1:8])
+shortnamesC=gsub("_CGATGT_.*","B",gsub("SEQC_ILM_AGR_","",gsub("_ATCACG_A.*","A",gsub("_ATCACG_B.*","B",colnames(agr)[Asamps1]))))
+colnames(agr)[Asamps1] <- shortnamesA
+
+shortnamesD=gsub("_CGATGT_.*","B",gsub("SEQC_ILM_BGI_","",gsub("_CGATGT_A.*","A",gsub("_CGATGT_B.*","B",colnames(bgi)[Bsamps1]))))
+colnames(bgi)[Bsamps1] <- shortnamesB
+mycorr <- cor(agr[,Asamps1],bgi[,Bsamps1])
+range(mycorr)
+corrplot(mycorr,method="number",number.cex=0.6)
+```
+e. The correlation is much higher when comparing in the flow cell of same lab than in different labs.
+
+
+3. Let's try and assess whether the distance metric used for hierarchical clustering makes a large difference.
+    a. Create a count matrix of the first 8 lanes of sample A (replicate 1) and the first 8 lanes of sample B (replicate 1).
+    
+    b. Transform the data appropriately (using DESeq2 methods, vst or rlog), and explain your method choice.
+    c. Perform and plot a hierarchical cluster on the transformed data using default metrics (Euclidean distance, complete linkage).
+    d. Perform and plot a hierarchical cluster on the transformed data using Euclidean distance and the method "Ward.D2" for linkage.
+    e. Compare and describe differences, if any, between c and d.
+    
+```{r}
+#count matrix
+mat = cbind(agr[,Asamps1], bgi[,Bsamps1])
+
+if(!require("DESeq2")){
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("DESeq2")
+  install.packages("DESeq2")
+  library(DESeq2)
+}
+if(!require("hexbin")){
+  install.packages("hexbin")
+  library(hexbin)
+}
+
+sampnames <- c(colnames(agr)[Asamps1],colnames(bgi)[Bsamps1])
+mylanes <- rep(paste0("L",1:8),2)
+mysamples <- c(rep("A",8),rep("B",8))
+sampmeta <- data.frame(SampleName=sampnames, lanes=mylanes, sampletype=mysamples)
+dds <- DESeqDataSetFromMatrix(countData = cbind(agr[,Asamps1],bgi[,Bsamps1]),
+                              colData = sampmeta,
+                              design = ~ lanes + sampletype)
+if(!require("vsn")){
+  biocLite("vsn")
+  library(vsn)
+}
+dds.vst <- vst(dds)
+
+dds.rlog <- rlog(dds)
+meanSdPlot(assay(dds.rlog),ranks=FALSE)
+
+#Rlog
+par(mfrow=c(1, 3))
+dds <- estimateSizeFactors(dds)
+lims <- c(-2, 20)
+plot(log(counts(dds, normalized=TRUE)[,c(1,8)] + 1), pch=16, cex=0.3, main="log(x + 1)", xlim=lims, ylim=lims)
+plot(assay(dds.rlog)[,c(1,8)], pch=16, cex=0.3, main="rlog", xlim=lims, ylim=lims)
+
+```
+Somehow vst did not work for me as it could not find the function vst for dds. So I tried using only rlog function.Though from the lectures it seems like rlog is a better choice as the sample size in <20.
+
+```{r}
+#Heirarchical cluster
+mydist.euc <- dist(t(assay(dds.rlog)))
+myclust.euc <- hclust(mydist.euc)
+myclust.euc
+par(mfrow=c(1,1))
+plot(myclust.euc,labels=paste(mylanes,mysamples), hang=-1)
+
+myclust.euc <- hclust(d = mydist.euc, method = "ward.D")
+myclust.euc
+par(mfrow=c(1,1))
+plot(myclust.euc,labels=paste(mylanes,mysamples), hang=-1)
+
+```
+Yes there are differences between c and d. The height of the clusters in complete linkage is larger as compared to ward.D. Also the samples are grouped differently in both the mechanisms.
+
+
+4. Let's compare PCA and MDS.
+    a. Using the data matrix created in b (transformed, you sould have 16 samples), perform  and plot PCA, using colors and symbols to separate replicate numbers and labs.
+    b. Same as above (a) but perform MDS, using 1-correlation as the distance metric.
+    c. Compare and describe differences, if any, between a and b.
+    
+```{r}
+pca.rlog <- prcomp(t(assay(dds.rlog))) # features in columns
+names(pca.rlog)
+summary(pca.rlog)
+percvar <- round(((pca.rlog$sdev)*(pca.rlog$sdev))/sum((pca.rlog$sdev)*(pca.rlog$sdev))*100,2)
+plot(percvar,type="b",pch=19,xlab="Component",ylab="% Variance Explained",main="PCA on rlog data")
+plot(pca.rlog$x[,1:2],pch="",main="PCA on rlog data")
+mycol = substr(paste(mylanes, mysamples),4,4)
+mycol[which(mycol == "A")]="blue"
+mycol[which(mycol == "B")]="red"
+text(pca.rlog$x, labels = paste(mylanes,mysamples), cex=.7,col=mycol)
+
+
+mydist.cor = as.dist(1-cor(assay(dds.rlog)))
+mds.euc <- cmdscale(mydist.cor,k=2) # k is dimensions
+rownames(mds.euc)=paste(mylanes,mysamples)
+plot(mds.euc, pch="",xlab="Dimension 1",ylab="Dimension 2", main = "1-correlation as metric")
+text(mds.euc, labels = rownames(mds.euc), cex=.7,col=mycol)
+
+```
+    
+In a. the A samples are clustered on the left whereas in problem b. the samples are distributed across left and right.
